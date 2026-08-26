@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { env } from '../../config/env.js';
 import { logger } from '../../utils/logger.js';
+import { alertService } from '../../services/alertService.js';
 
 export const createClaudeNode = (customModel = null) => {
   const geminiKey = env.GEMINI_API_KEY || process.env.GEMINI_API_KEY;
@@ -15,24 +16,40 @@ export const createClaudeNode = (customModel = null) => {
 
       if (geminiKey) {
         const genAI = new GoogleGenerativeAI(geminiKey);
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+        const model = genAI.getGenerativeModel({
+          model: 'gemini-1.5-flash',
+          generationConfig: {
+            maxOutputTokens: 180, // Token cost control
+            temperature: 0.7,
+          },
+        });
+
         const prompt = `You are Anthropic Claude. Provide a STRATEGIC, NUANCED, HIGH-LEVEL perspective on this dilemma.
-Synthesize long-term strategic positioning, subtle edge cases, and human alignment.
-Provide 2-3 thoughtful points.
+Synthesize long-term positioning in 2 thoughtful points (max 70 words total).
 
 Dilemma: ${state.topic}`;
 
-        const result = await model.generateContent(prompt);
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('claudeNode API call timed out after 8s')), 8000)
+        );
+
+        const result = await Promise.race([model.generateContent(prompt), timeoutPromise]);
         return { claudeOpinion: result.response.text().trim() };
       }
 
       return {
-        claudeOpinion: `• Strategic Positioning: Aligns with long-term technological shifts.\n• Nuanced Balance: Synergizes best when paired with complementary domain skills.\n• Sustainable Maturity: Fosters architectural thinking and deep problem-solving.`,
+        claudeOpinion: `• Strategic Positioning: Aligns with long-term technological shifts.\n• Nuanced Balance: Synergizes best when paired with complementary domain skills.`,
       };
     } catch (err) {
-      logger.warn({ err: err.message }, 'claudeNode failed, using fallback');
+      await alertService.triggerAlert({
+        level: 'WARNING',
+        source: 'claudeNode',
+        message: 'Node execution failed or timed out; applying resilient fallback',
+        error: err,
+      });
+
       return {
-        claudeOpinion: `• Strategic Positioning: ${state.topic} builds long-term career adaptability.\n• Nuanced View: Balance rapid execution with deep foundational understanding.\n• Sustainability: Focus on mastery rather than superficial familiarity.`,
+        claudeOpinion: `• Strategic Positioning: ${state.topic} builds long-term career adaptability.\n• Sustainability: Focus on deep mastery rather than superficial familiarity.`,
       };
     }
   };
