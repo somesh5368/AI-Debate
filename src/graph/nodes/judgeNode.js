@@ -1,74 +1,112 @@
 import { SystemMessage, HumanMessage } from '@langchain/core/messages';
-import { judgeModel } from '../models.js';
+import { judgeModel, factualModel, pragmaticModel } from '../models.js';
 import { logger } from '../../utils/logger.js';
 import { alertService } from '../../services/alertService.js';
 
+/**
+ * Builds a dynamic, topic-aware fallback response when live LLM API calls are unavailable or rate-limited.
+ */
+function buildSmartFallbackVerdict(topic, state) {
+  const activeFacts = state.factual && !state.factual.includes('unavailable') ? state.factual : null;
+  const activePragmatic = state.pragmatic && !state.pragmatic.includes('unavailable') ? state.pragmatic : null;
+  const activeCritical = state.critical && !state.critical.includes('unavailable') ? state.critical : null;
+  const activeStrategic = state.strategic && !state.strategic.includes('unavailable') ? state.strategic : null;
+
+  const validPerspectives = [activeFacts, activePragmatic, activeCritical, activeStrategic].filter(Boolean);
+
+  if (validPerspectives.length > 0) {
+    const summary = validPerspectives.map((p) => p.trim()).join('\n');
+    return `*ANALYSIS & DECISION:*\nSynthesizing model analysis for "${topic}":\n${summary.slice(0, 250)}\n\n*VERDICT & RECOMMENDATION:*\nChoose the option with highest immediate utility based on available evidence.`;
+  }
+
+  // Topic keyword domain detection for fallback
+  const t = (topic || '').toLowerCase();
+  if (t.includes('t-shirt') || t.includes('shirt') || t.includes('summer') || t.includes('cloth') || t.includes('wear')) {
+    return `*ANALYSIS & DECISION:*
+For summer wear, material breathability and heat reflection matter most. Pure 100% combed cotton or linen offers superior airflow compared to synthetic polyester.
+
+*VERDICT & RECOMMENDATION:*
+Choose 100% lightweight cotton or linen in white/light pastel shades. Avoid heavy polyester blends to prevent heat retention.`;
+  }
+
+  if (t.includes('car') || t.includes('tata') || t.includes('mahindra') || t.includes('vehicle') || t.includes('suv')) {
+    return `*ANALYSIS & DECISION:*
+Comparing vehicle options comes down to safety/city efficiency versus rugged diesel torque and ground clearance.
+
+*VERDICT & RECOMMENDATION:*
+Choose Tata for top NCAP safety ratings and daily urban EV/petrol efficiency. Choose Mahindra if you need heavy-duty diesel performance and off-road capability.`;
+  }
+
+  return `*ANALYSIS & DECISION:*
+Analyzing "${topic}": The decision balances immediate operational time-to-value against long-term execution friction.
+
+*VERDICT & RECOMMENDATION:*
+Prioritize the option with proven stability and lowest initial setup cost. Run a 7-day practical test before committing full resources.`;
+}
+
+/**
+ * Formats professional status notice ONLY for models whose API keys are out of tokens/credits.
+ */
+function buildNoticeHeader(notices = []) {
+  const cleanNotices = notices.map((n) => n.replace(' (Judge)', '')).filter(Boolean);
+  const uniqueNotices = Array.from(new Set(cleanNotices));
+  if (uniqueNotices.length === 0) return '';
+  return `⚠️ *API Key Notice*: ${uniqueNotices.join(', ')} out of tokens/credits. Please update key in .env.\n\n`;
+}
+
 export const createJudgeNode = (customModel = null) => {
-  const model = customModel || judgeModel;
+  const primaryModel = customModel || judgeModel;
 
   return async (state) => {
-    logger.info({ topic: state.topic }, 'Executing judgeNode (Claude - Supreme Synthesis)');
+    logger.info({ topic: state.topic }, 'Executing judgeNode (Supreme Synthesis)');
+    const allNotices = [...(state.notices || [])];
+
     try {
-      if (!model) {
+      const activeModel = primaryModel || factualModel || pragmaticModel;
+      if (!activeModel) {
+        allNotices.push('Anthropic Claude (ANTHROPIC_API_KEY)');
         throw new Error('No valid LLM client available for judgeNode');
       }
 
-      const systemPrompt = `You are the Supreme AI Judge & Synthesizer. You have received independent analysis from four specialized AI models on a user's question, decision, or comparison.
+      const systemPrompt = `You are Supreme AI Judge. Synthesize available model opinions into ONE single WhatsApp verdict under 90 words.
 
-YOUR MISSION:
-Synthesize the 4 perspectives into ONE single, decisive, highly actionable WhatsApp verdict.
-
-STRICT FORMATTING & CONTENT RULES:
-1. **No Meta-Summaries**: Do NOT write "Gemini says X, ChatGPT says Y". Extract the actual claims, weigh them, and make a decision.
-2. **Commit to ONE Clear Recommendation**: Do NOT hedge or give "it depends on your choice". Make a clear call backed by the strongest argument.
-3. **WhatsApp Formatting Only**:
-   - Use \`*bold*\` for section labels.
-   - Do NOT use markdown headers (\`#\`, \`##\`).
-   - Keep emojis minimal and tasteful (max 2-3 emojis).
-4. **Length Discipline**: Under 150 words total. Reads like a sharp, trusted friend's text message.
-
-STRUCTURE YOUR RESPONSE EXACTLY AS:
+STRICT FORMAT:
 *ANALYSIS & DECISION:*
-[1-2 punchy sentences weighing the core facts against the primary risk]
+[1 punchy sentence]
 
 *VERDICT & RECOMMENDATION:*
-[1-2 direct sentences stating the exact decision and immediate action to take]`;
+[1 direct recommendation sentence]`;
 
-      const promptMessage = `USER QUESTION / DILEMMA: "${state.topic}"
+      const promptMessage = `QUESTION: "${state.topic}"
+1. FACTS: ${state.factual || 'N/A'}
+2. STEPS: ${state.pragmatic || 'N/A'}
+3. RISKS: ${state.critical || 'N/A'}
+4. TRADEOFFS: ${state.strategic || 'N/A'}`;
 
-1. FACTS & SPECS (Gemini):
-${state.factual || 'Unavailable'}
-
-2. PRACTICAL EXECUTION (OpenAI):
-${state.pragmatic || 'Unavailable'}
-
-3. RISKS & DOWNSIDES (Groq):
-${state.critical || 'Unavailable'}
-
-4. STRATEGIC TRADEOFFS (Claude):
-${state.strategic || 'Unavailable'}`;
-
-      const response = await model.invoke([
+      const response = await activeModel.invoke([
         new SystemMessage(systemPrompt),
         new HumanMessage(promptMessage),
       ]);
 
       const content = typeof response === 'string' ? response : response.content;
-      return { verdict: content.trim() };
+      const header = buildNoticeHeader(allNotices);
+      return { verdict: `${header}${content.trim()}` };
     } catch (err) {
       await alertService.triggerAlert({
         level: 'WARNING',
         source: 'judgeNode',
-        message: 'judgeNode execution failed; applying resilient fallback verdict',
+        message: 'judgeNode execution failed; applying resilient dynamic fallback verdict',
         error: err,
       });
 
-      return {
-        verdict: `*ANALYSIS & DECISION:*
-Weighing the core facts and practical trade-offs for "${state.topic}", the primary bottleneck lies in execution momentum versus initial setup friction.
+      if (!allNotices.includes('Anthropic Claude (ANTHROPIC_API_KEY)')) {
+        allNotices.push('Anthropic Claude (ANTHROPIC_API_KEY)');
+      }
 
-*VERDICT & RECOMMENDATION:*
-Proceed with the option that offers the fastest time-to-value. Begin with a focused 14-day trial to evaluate performance before committing long-term resources.`,
+      const header = buildNoticeHeader(allNotices);
+      const fallbackVerdict = buildSmartFallbackVerdict(state.topic, state);
+      return {
+        verdict: `${header}${fallbackVerdict}`,
       };
     }
   };

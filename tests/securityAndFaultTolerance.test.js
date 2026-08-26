@@ -55,7 +55,7 @@ describe('Security, Token Optimization & Fault Tolerance Suite', () => {
 
       const state = await failingFactualNode({ topic: 'Test Topic' });
 
-      expect(state.factual).toContain('Factual Data Perspective temporarily unavailable');
+      expect(state.factual).toContain('Gemini facts unavailable');
       expect(spyAlert).toHaveBeenCalledWith(
         expect.objectContaining({
           source: 'factualNode',

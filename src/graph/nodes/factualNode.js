@@ -7,20 +7,13 @@ export const createFactualNode = (customModel = null) => {
   const model = customModel || factualModel;
 
   return async (state) => {
-    logger.info({ topic: state.topic }, 'Executing factualNode (Google Gemini - Facts & Specs)');
+    logger.info({ topic: state.topic }, 'Executing factualNode (Google Gemini)');
     try {
       if (!model) {
-        throw new Error('No valid LLM client available for factualNode');
+        throw new Error('Google Gemini API key missing or invalid');
       }
 
-      const systemPrompt = `You are an expert Factual Data Analyst (Google Gemini).
-Given a user's decision, comparison, or dilemma, analyze the SPECIFIC content of the question.
-
-STRICT RULES:
-1. ZERO FILL-IN-THE-BLANK TEMPLATES. Do NOT write generic sentences with the topic string dropped in (e.g., "High adoption rate for [topic]").
-2. Identify 2-3 concrete, verifiable facts, technical specs, numbers, prices, or hard industry data points that bear directly on this specific topic.
-3. If analyzing cars, talk actual engines/safety NCAP ratings/EV ranges. If analyzing tech stack, talk actual performance/ecosystem/jobs. If analyzing a career/life decision, talk actual market salary/statistics/timelines.
-4. Keep output under 150 words (2-3 concrete bullet points). No fluff.`;
+      const systemPrompt = `You are a Factual Data Analyst (Gemini). State 2 concise verifiable facts/data points about this topic (max 40 words total). No fluff.`;
 
       const response = await model.invoke([
         new SystemMessage(systemPrompt),
@@ -33,12 +26,13 @@ STRICT RULES:
       await alertService.triggerAlert({
         level: 'WARNING',
         source: 'factualNode',
-        message: 'factualNode execution failed; applying resilient fallback',
+        message: 'factualNode execution failed',
         error: err,
       });
 
       return {
-        factual: `[Factual Data Perspective temporarily unavailable due to API rate limit / model response error.]`,
+        factual: `[Gemini facts unavailable]`,
+        notices: ['Google Gemini (GEMINI_API_KEY)'],
       };
     }
   };

@@ -12,90 +12,90 @@ const openaiKey = env.OPENAI_API_KEY || process.env.OPENAI_API_KEY;
 const groqKey = env.GROQ_API_KEY || process.env.GROQ_API_KEY;
 
 /**
- * 1. Factual Node Model: Google Gemini (gemini-1.5-flash)
+ * 1. Factual Node Model: Google Gemini (gemini-1.5-flash) - Max 120 Tokens
  */
 export const factualModel = googleKey
   ? new ChatGoogleGenerativeAI({
       model: 'gemini-1.5-flash',
       apiKey: googleKey,
       temperature: 0.2,
-      maxOutputTokens: 300,
+      maxOutputTokens: 120,
     })
   : null;
 
 /**
- * 2. Pragmatic Node Model: OpenAI (gpt-4o-mini)
+ * 2. Pragmatic Node Model: OpenAI (gpt-4o-mini) - Max 120 Tokens
  */
 export const pragmaticModel = openaiKey
   ? new ChatOpenAI({
       model: 'gpt-4o-mini',
       openAIApiKey: openaiKey,
       temperature: 0.4,
-      maxTokens: 300,
+      maxTokens: 120,
     })
   : googleKey
   ? new ChatGoogleGenerativeAI({
       model: 'gemini-1.5-flash',
       apiKey: googleKey,
       temperature: 0.4,
-      maxOutputTokens: 300,
+      maxOutputTokens: 120,
     })
   : null;
 
 /**
- * 3. Critical Node Model: Groq (mixtral-8x7b-32768)
+ * 3. Critical Node Model: Groq (llama-3.3-70b-versatile) - Max 120 Tokens
  */
 export const criticalModel = groqKey
   ? new ChatGroq({
-      model: 'mixtral-8x7b-32768',
+      model: 'llama-3.3-70b-versatile',
       apiKey: groqKey,
       temperature: 0.5,
-      maxTokens: 300,
+      maxTokens: 120,
     })
   : googleKey
   ? new ChatGoogleGenerativeAI({
       model: 'gemini-1.5-flash',
       apiKey: googleKey,
       temperature: 0.5,
-      maxOutputTokens: 300,
+      maxOutputTokens: 120,
     })
   : null;
 
 /**
- * 4. Strategic Node Model: Anthropic Claude (claude-3-5-sonnet-latest)
+ * 4. Strategic Node Model: Anthropic Claude (claude-3-5-sonnet-latest) - Max 120 Tokens
  */
 export const strategicModel = anthropicKey
   ? new ChatAnthropic({
       model: 'claude-3-5-sonnet-latest',
       anthropicApiKey: anthropicKey,
       temperature: 0.5,
-      maxTokens: 300,
+      maxTokens: 120,
     })
   : googleKey
   ? new ChatGoogleGenerativeAI({
       model: 'gemini-1.5-flash',
       apiKey: googleKey,
       temperature: 0.5,
-      maxOutputTokens: 300,
+      maxOutputTokens: 120,
     })
   : null;
 
 /**
- * 5. Supreme Judge Model: Anthropic Claude (claude-3-5-sonnet-latest)
+ * 5. Supreme Judge Model: Anthropic Claude (claude-3-5-sonnet-latest) - Max 180 Tokens
  */
 export const judgeModel = anthropicKey
   ? new ChatAnthropic({
       model: 'claude-3-5-sonnet-latest',
       anthropicApiKey: anthropicKey,
       temperature: 0.3,
-      maxTokens: 350,
+      maxTokens: 180,
     })
   : googleKey
   ? new ChatGoogleGenerativeAI({
       model: 'gemini-1.5-flash',
       apiKey: googleKey,
       temperature: 0.3,
-      maxOutputTokens: 350,
+      maxOutputTokens: 180,
     })
   : null;
 
@@ -106,5 +106,5 @@ logger.info(
     hasOpenAI: Boolean(openaiKey),
     hasGroq: Boolean(groqKey),
   },
-  'Multi-Model Providers Initialized'
+  'Multi-Model Providers Initialized (Low Token Budgeting Active)'
 );

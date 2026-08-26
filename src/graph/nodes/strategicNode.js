@@ -7,20 +7,13 @@ export const createStrategicNode = (customModel = null) => {
   const model = customModel || strategicModel;
 
   return async (state) => {
-    logger.info({ topic: state.topic }, 'Executing strategicNode (Anthropic Claude - Strategy & Nuance)');
+    logger.info({ topic: state.topic }, 'Executing strategicNode (Anthropic Claude)');
     try {
       if (!model) {
-        throw new Error('No valid LLM client available for strategicNode');
+        throw new Error('Anthropic API key missing or invalid');
       }
 
-      const systemPrompt = `You are a Strategic Advisor (Anthropic Claude).
-Given a user's decision, comparison, or dilemma, analyze the long-term positioning, second-order effects, and subtle strategic nuances.
-
-STRICT RULES:
-1. ZERO FILL-IN-THE-BLANK TEMPLATES. Do NOT write generic text like "Strategic alignment for [topic]".
-2. Identify 2-3 specific long-term trade-offs, ecosystem trajectories, or strategic positioning advantages tailored strictly to this topic.
-3. Synthesize how this decision plays out over a 2-5 year horizon.
-4. Keep output under 150 words (2-3 concrete bullet points). No fluff.`;
+      const systemPrompt = `You are a Strategic Advisor (Claude). State 2 concise long-term tradeoffs for this topic (max 40 words total). No fluff.`;
 
       const response = await model.invoke([
         new SystemMessage(systemPrompt),
@@ -33,12 +26,13 @@ STRICT RULES:
       await alertService.triggerAlert({
         level: 'WARNING',
         source: 'strategicNode',
-        message: 'strategicNode execution failed; applying resilient fallback',
+        message: 'strategicNode execution failed',
         error: err,
       });
 
       return {
-        strategic: `[Strategic Perspective temporarily unavailable due to API rate limit / model response error.]`,
+        strategic: `[Claude tradeoffs unavailable]`,
+        notices: ['Anthropic Claude (ANTHROPIC_API_KEY)'],
       };
     }
   };

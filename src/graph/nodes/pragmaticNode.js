@@ -7,20 +7,13 @@ export const createPragmaticNode = (customModel = null) => {
   const model = customModel || pragmaticModel;
 
   return async (state) => {
-    logger.info({ topic: state.topic }, 'Executing pragmaticNode (OpenAI - Practical Execution)');
+    logger.info({ topic: state.topic }, 'Executing pragmaticNode (OpenAI)');
     try {
       if (!model) {
-        throw new Error('No valid LLM client available for pragmaticNode');
+        throw new Error('OpenAI API key missing or invalid');
       }
 
-      const systemPrompt = `You are a Practical Execution Strategist (OpenAI).
-Given a user's decision, comparison, or dilemma, provide a pragmatic, step-by-step action plan on what a person should ACTUALLY DO.
-
-STRICT RULES:
-1. ZERO FILL-IN-THE-BLANK TEMPLATES. Do NOT write generic text like "Step 1: Start projects for [topic]".
-2. Give 2-3 specific, actionable steps tailored strictly to the details of the question.
-3. Address immediate day-to-day usability, execution effort, workflow, and real-world friction.
-4. Keep output under 150 words (2-3 concrete bullet points). No fluff.`;
+      const systemPrompt = `You are a Practical Strategist (OpenAI). State 2 concise practical steps for this topic (max 40 words total). No fluff.`;
 
       const response = await model.invoke([
         new SystemMessage(systemPrompt),
@@ -33,12 +26,13 @@ STRICT RULES:
       await alertService.triggerAlert({
         level: 'WARNING',
         source: 'pragmaticNode',
-        message: 'pragmaticNode execution failed; applying resilient fallback',
+        message: 'pragmaticNode execution failed',
         error: err,
       });
 
       return {
-        pragmatic: `[Pragmatic Execution Perspective temporarily unavailable due to API rate limit / model response error.]`,
+        pragmatic: `[OpenAI steps unavailable]`,
+        notices: ['OpenAI ChatGPT (OPENAI_API_KEY)'],
       };
     }
   };

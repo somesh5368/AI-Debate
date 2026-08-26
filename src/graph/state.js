@@ -9,6 +9,7 @@ import { Annotation } from '@langchain/langgraph';
  * - critical: Groq / Llama risk, downsides, hidden failure points
  * - strategic: Claude long-term tradeoffs, second-order effects, positioning
  * - verdict: Supreme Judge single synthesized WhatsApp response
+ * - notices: array of API key status notices for transparent reporting
  */
 export const DebateState = Annotation.Root({
   topic: Annotation({
@@ -34,5 +35,9 @@ export const DebateState = Annotation.Root({
   verdict: Annotation({
     value: (left, right) => (right !== undefined ? right : left),
     default: () => '',
+  }),
+  notices: Annotation({
+    value: (left, right) => (right ? [...(left || []), ...right] : left || []),
+    default: () => [],
   }),
 });
