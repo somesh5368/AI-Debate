@@ -3,58 +3,60 @@ import twilio from 'twilio';
 const MessagingResponse = twilio.twiml.MessagingResponse;
 
 /**
- * Formats multi-model debate state into an impressive, premium WhatsApp template.
+ * Formats state verdict for WhatsApp production delivery.
+ * Only the judge's verdict is sent to the user.
  *
  * @param {Object} state
- * @param {string} state.topic
- * @param {string} state.geminiOpinion
- * @param {string} state.chatgptOpinion
- * @param {string} state.groqOpinion
- * @param {string} state.claudeOpinion
- * @param {string} state.finalVerdict
+ * @param {string} state.verdict
  * @returns {string} Formatted WhatsApp message text
  */
 export const formatDebateResponse = (state) => {
-  const {
-    topic,
-    geminiOpinion,
-    chatgptOpinion,
-    groqOpinion,
-    claudeOpinion,
-    finalVerdict,
-  } = state;
-
-  const rawFormatted = `⚡ *MULTI-MODEL AI DEBATE ARENA* ⚡
-
-❓ *QUESTION / DILEMMA:*
-"${topic || 'Your Decision'}"
-
-========================================
-🤖 *1. GOOGLE GEMINI (Factual & Precise):*
-${geminiOpinion ? geminiOpinion.trim() : 'No response.'}
-
-========================================
-💡 *2. CHATGPT (Pragmatic & Structured):*
-${chatgptOpinion ? chatgptOpinion.trim() : 'No response.'}
-
-========================================
-🔥 *3. GROQ / LLAMA (Critical & Risk):*
-${groqOpinion ? groqOpinion.trim() : 'No response.'}
-
-========================================
-🧠 *4. ANTHROPIC CLAUDE (Strategic & Nuanced):*
-${claudeOpinion ? claudeOpinion.trim() : 'No response.'}
-
-========================================
-🏛️ *SUPREME VERDICT & FINAL RECOMMENDATION:*
-${finalVerdict ? finalVerdict.trim() : 'No verdict.'}`;
+  const verdictText = state?.verdict ? state.verdict.trim() : 'No verdict generated.';
 
   // Truncate safely if exceeding WhatsApp limits (~1500 chars)
-  if (rawFormatted.length > 1500) {
-    return rawFormatted.slice(0, 1490) + '\n\n...[Full verdict truncated]';
+  if (verdictText.length > 1500) {
+    return verdictText.slice(0, 1490) + '\n\n...[Truncated]';
   }
 
-  return rawFormatted;
+  return verdictText;
+};
+
+/**
+ * Debug Formatter for CLI testing & server logging.
+ * Displays all 4 raw node outputs alongside the final verdict.
+ *
+ * @param {Object} state
+ * @returns {string} Formatted multi-perspective debug view
+ */
+export const formatDebugDebateResponse = (state) => {
+  const { topic, factual, pragmatic, critical, strategic, verdict } = state;
+
+  return `================================================
+⚡ MULTI-MODEL DEBATE DEBUG TRACE
+================================================
+❓ TOPIC / QUESTION:
+"${topic}"
+
+------------------------------------------------
+🤖 1. GEMINI (Factual Facts & Specs):
+${factual ? factual.trim() : 'N/A'}
+
+------------------------------------------------
+💡 2. OPENAI (Pragmatic Execution):
+${pragmatic ? pragmatic.trim() : 'N/A'}
+
+------------------------------------------------
+🔥 3. GROQ (Critical Risk & Downsides):
+${critical ? critical.trim() : 'N/A'}
+
+------------------------------------------------
+🧠 4. CLAUDE (Strategic Tradeoffs & Positioning):
+${strategic ? strategic.trim() : 'N/A'}
+
+================================================
+🏛️ FINAL WHATSAPP VERDICT (SENT TO USER):
+${verdict ? verdict.trim() : 'N/A'}
+================================================`;
 };
 
 /**

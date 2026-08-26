@@ -1,64 +1,74 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import { env } from '../../config/env.js';
+import { SystemMessage, HumanMessage } from '@langchain/core/messages';
+import { judgeModel } from '../models.js';
 import { logger } from '../../utils/logger.js';
 import { alertService } from '../../services/alertService.js';
 
 export const createJudgeNode = (customModel = null) => {
-  const geminiKey = env.GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+  const model = customModel || judgeModel;
 
   return async (state) => {
-    logger.info({ topic: state.topic }, 'Executing judgeNode (Supreme Synthesis)');
+    logger.info({ topic: state.topic }, 'Executing judgeNode (Claude - Supreme Synthesis)');
     try {
-      if (customModel) {
-        const res = await customModel.invoke(state.topic);
-        return { finalVerdict: typeof res === 'string' ? res : res.content };
+      if (!model) {
+        throw new Error('No valid LLM client available for judgeNode');
       }
 
-      if (geminiKey) {
-        const genAI = new GoogleGenerativeAI(geminiKey);
-        const model = genAI.getGenerativeModel({
-          model: 'gemini-1.5-flash',
-          generationConfig: {
-            maxOutputTokens: 250, // Token cost control for judge synthesis
-            temperature: 0.7,
-          },
-        });
+      const systemPrompt = `You are the Supreme AI Judge & Synthesizer. You have received independent analysis from four specialized AI models on a user's question, decision, or comparison.
 
-        const prompt = `You are the Supreme AI Judge. Synthesize available model opinions on this dilemma into a structured verdict (max 150 words):
+YOUR MISSION:
+Synthesize the 4 perspectives into ONE single, decisive, highly actionable WhatsApp verdict.
 
-DILEMMA: ${state.topic}
+STRICT FORMATTING & CONTENT RULES:
+1. **No Meta-Summaries**: Do NOT write "Gemini says X, ChatGPT says Y". Extract the actual claims, weigh them, and make a decision.
+2. **Commit to ONE Clear Recommendation**: Do NOT hedge or give "it depends on your choice". Make a clear call backed by the strongest argument.
+3. **WhatsApp Formatting Only**:
+   - Use \`*bold*\` for section labels.
+   - Do NOT use markdown headers (\`#\`, \`##\`).
+   - Keep emojis minimal and tasteful (max 2-3 emojis).
+4. **Length Discipline**: Under 150 words total. Reads like a sharp, trusted friend's text message.
 
-1. Gemini (Factual): ${state.geminiOpinion || 'N/A'}
-2. ChatGPT (Pragmatic): ${state.chatgptOpinion || 'N/A'}
-3. Groq (Risk): ${state.groqOpinion || 'N/A'}
-4. Claude (Strategic): ${state.claudeOpinion || 'N/A'}
+STRUCTURE YOUR RESPONSE EXACTLY AS:
+*ANALYSIS & DECISION:*
+[1-2 punchy sentences weighing the core facts against the primary risk]
 
-Format output strictly as:
-*Cross-Model Analysis*: [1-2 sentences]
-*Winning Perspective*: [Which model had best advice]
-*Final Verdict*: [1-2 actionable sentences]`;
+*VERDICT & RECOMMENDATION:*
+[1-2 direct sentences stating the exact decision and immediate action to take]`;
 
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('judgeNode API call timed out after 8s')), 8000)
-        );
+      const promptMessage = `USER QUESTION / DILEMMA: "${state.topic}"
 
-        const result = await Promise.race([model.generateContent(prompt), timeoutPromise]);
-        return { finalVerdict: result.response.text().trim() };
-      }
+1. FACTS & SPECS (Gemini):
+${state.factual || 'Unavailable'}
 
-      return {
-        finalVerdict: `*Cross-Model Analysis*: Gemini and ChatGPT emphasize strong practical demand, while Groq warns of setup friction. Claude synthesizes long-term adaptability.\n\n*Winning Perspective*: ChatGPT's pragmatic approach is most actionable.\n\n*Final Verdict*: Commit to a focused 30-day hands-on project to build momentum before expanding into advanced concepts.`,
-      };
+2. PRACTICAL EXECUTION (OpenAI):
+${state.pragmatic || 'Unavailable'}
+
+3. RISKS & DOWNSIDES (Groq):
+${state.critical || 'Unavailable'}
+
+4. STRATEGIC TRADEOFFS (Claude):
+${state.strategic || 'Unavailable'}`;
+
+      const response = await model.invoke([
+        new SystemMessage(systemPrompt),
+        new HumanMessage(promptMessage),
+      ]);
+
+      const content = typeof response === 'string' ? response : response.content;
+      return { verdict: content.trim() };
     } catch (err) {
       await alertService.triggerAlert({
         level: 'WARNING',
         source: 'judgeNode',
-        message: 'judgeNode synthesis failed or timed out; applying resilient fallback verdict',
+        message: 'judgeNode execution failed; applying resilient fallback verdict',
         error: err,
       });
 
       return {
-        finalVerdict: `*Cross-Model Analysis*: Evaluating all perspectives for "${state.topic}", Gemini & ChatGPT emphasize execution, Groq highlights risk mitigation, and Claude provides strategic positioning.\n\n*Winning Perspective*: Balanced multi-perspective consensus.\n\n*Final Verdict*: Proceed with structured execution. Start with a 30-day trial project to validate momentum.`,
+        verdict: `*ANALYSIS & DECISION:*
+Weighing the core facts and practical trade-offs for "${state.topic}", the primary bottleneck lies in execution momentum versus initial setup friction.
+
+*VERDICT & RECOMMENDATION:*
+Proceed with the option that offers the fastest time-to-value. Begin with a focused 14-day trial to evaluate performance before committing long-term resources.`,
       };
     }
   };

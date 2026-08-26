@@ -1,44 +1,44 @@
 import { StateGraph, START, END } from '@langchain/langgraph';
 import { DebateState } from './state.js';
-import { geminiNode } from './nodes/geminiNode.js';
-import { chatgptNode } from './nodes/chatgptNode.js';
-import { groqNode } from './nodes/groqNode.js';
-import { claudeNode } from './nodes/claudeNode.js';
+import { factualNode } from './nodes/factualNode.js';
+import { pragmaticNode } from './nodes/pragmaticNode.js';
+import { criticalNode } from './nodes/criticalNode.js';
+import { strategicNode } from './nodes/strategicNode.js';
 import { judgeNode } from './nodes/judgeNode.js';
 
 /**
- * 4-LLM Multi-Model Ensemble StateGraph.
+ * 4-LLM Multi-Model Debate Architecture.
  *
  * Topology:
- *                        START
- *             /        /       \        \
- *     geminiNode chatgptNode groqNode claudeNode (4-way parallel fan-out)
- *             \        \       /        /
- *                     judgeNode                 (fan-in synthesizer)
- *                         |
- *                        END
+ *                              START
+ *               /          /          \          \
+ *      factualNode pragmaticNode criticalNode strategicNode (4-way parallel fan-out)
+ *               \          \          /          /
+ *                           judgeNode                       (fan-in synthesizer)
+ *                               |
+ *                              END
  */
 export const createDebateGraph = (customNodes = {}) => {
-  const gNode = customNodes.geminiNode || geminiNode;
-  const gptNode = customNodes.chatgptNode || chatgptNode;
-  const grqNode = customNodes.groqNode || groqNode;
-  const cNode = customNodes.claudeNode || claudeNode;
+  const fNode = customNodes.factualNode || factualNode;
+  const pNode = customNodes.pragmaticNode || pragmaticNode;
+  const cNode = customNodes.criticalNode || criticalNode;
+  const sNode = customNodes.strategicNode || strategicNode;
   const jNode = customNodes.judgeNode || judgeNode;
 
   const graph = new StateGraph(DebateState)
-    .addNode('geminiNode', gNode)
-    .addNode('chatgptNode', gptNode)
-    .addNode('groqNode', grqNode)
-    .addNode('claudeNode', cNode)
+    .addNode('factualNode', fNode)
+    .addNode('pragmaticNode', pNode)
+    .addNode('criticalNode', cNode)
+    .addNode('strategicNode', sNode)
     .addNode('judgeNode', jNode)
-    .addEdge(START, 'geminiNode')
-    .addEdge(START, 'chatgptNode')
-    .addEdge(START, 'groqNode')
-    .addEdge(START, 'claudeNode')
-    .addEdge('geminiNode', 'judgeNode')
-    .addEdge('chatgptNode', 'judgeNode')
-    .addEdge('groqNode', 'judgeNode')
-    .addEdge('claudeNode', 'judgeNode')
+    .addEdge(START, 'factualNode')
+    .addEdge(START, 'pragmaticNode')
+    .addEdge(START, 'criticalNode')
+    .addEdge(START, 'strategicNode')
+    .addEdge('factualNode', 'judgeNode')
+    .addEdge('pragmaticNode', 'judgeNode')
+    .addEdge('criticalNode', 'judgeNode')
+    .addEdge('strategicNode', 'judgeNode')
     .addEdge('judgeNode', END);
 
   return graph.compile();

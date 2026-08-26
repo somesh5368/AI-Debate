@@ -8,6 +8,7 @@ const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   ANTHROPIC_API_KEY: z.string().min(1, { message: 'ANTHROPIC_API_KEY is required' }).optional().or(z.literal('')),
   GEMINI_API_KEY: z.string().optional(),
+  GOOGLE_API_KEY: z.string().optional(),
   OPENAI_API_KEY: z.string().optional(),
   GROQ_API_KEY: z.string().optional(),
   TWILIO_ACCOUNT_SID: z.string().optional(),
