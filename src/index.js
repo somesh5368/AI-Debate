@@ -17,7 +17,8 @@ app.use('/', routes);
 app.use(errorHandler);
 
 if (env.NODE_ENV !== 'test') {
-  app.listen(env.PORT, () => {
-    logger.info(`🚀 WhatsApp Debate Bot running on port ${env.PORT} [${env.NODE_ENV}]`);
+  const port = process.env.PORT || env.PORT || 3000;
+  app.listen(port, () => {
+    logger.info(`🚀 WhatsApp Debate Bot running on port ${port} [${env.NODE_ENV}]`);
   });
 }

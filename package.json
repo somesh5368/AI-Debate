@@ -10,6 +10,9 @@
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand",
     "test:local": "node scripts/testLocal.js"
   },
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "keywords": [
     "langgraph",
     "langchain",
